@@ -171,40 +171,61 @@ export const logoutUser = async (req, res) => {
 };
 
 export const authMe = async (req, res) => {
-    return res.status(200).json({
-        success: true,
-        user: req.user,
-        message: "Authenticated successfully",
-    });
+  return res.status(200).json({
+    success: true,
+    user: req.user,
+    message: "Authenticated successfully",
+  });
 };
 
 // Tạo access token mới dựa trên refresh token
 export const refreshToken = async (req, res) => {
-    try{
-        // lấy refresh token từ cookie
-        const token = req.cookies?.refreshToken;
-        if (!token) {
-            return res.status(401).json({ message: "Access Denied: No refresh token provided" });
-        }
-
-        // so sánh với refresh token trong db
-        const session = await Session.findOne({ refreshToken: token });
-
-        if (!session) {
-            return res.status(403).json({ message: "Access Denied: Invalid refresh token" });
-        }
-        // kiểm tra thời gian hết hạn của refresh token
-        if (session.expiresAt < new Date()) {
-            return res.status(403).json({ message: "Access Denied: Refresh token expired" });
-        }
-
-        // tạo access token mới
-        const newAccessToken = jwt.sign({ id: session.userId }, process.env.JWT_SECRET, {expiresIn: ACCESS_TOKEN_TTL});
-        // trả access token mới về cho client
-        return res.status(200).json({ accessToken: newAccessToken });
-    }catch(error){
-        console.error("Refresh Token Error:", error);
-        return res.status(500).json({ message: "Internal Server Error" });
+  try {
+    // lấy refresh token từ cookie
+    const token = req.cookies?.refreshToken;
+    if (!token) {
+      return res
+        .status(401)
+        .json({ message: "Access Denied: No refresh token provided" });
     }
 
-}
+    // so sánh với refresh token trong db
+    const session = await Session.findOne({ refreshToken: token });
+
+    if (!session) {
+      return res
+        .status(403)
+        .json({ message: "Access Denied: Invalid refresh token" });
+    }
+    // kiểm tra thời gian hết hạn của refresh token
+    if (session.expiresAt < new Date()) {
+      return res
+        .status(403)
+        .json({ message: "Access Denied: Refresh token expired" });
+    }
+
+    // tạo access token mới
+    const newAccessToken = jwt.sign(
+      { id: session.userId },
+      process.env.JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_TTL },
+    );
+    // trả access token mới về cho client
+    return res.status(200).json({ accessToken: newAccessToken });
+  } catch (error) {
+    console.error("Refresh Token Error:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const userData = await userModel.findById(userId).select("-password");
+
+    res.json({ success: true, userData });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
