@@ -4,6 +4,7 @@ import validator from "validator";
 import userModel from "../models/User.js";
 import crypto from "crypto";
 import Session from "../models/Session.js";
+import {cloudinary} from "../libs/cloudinary.js"; 
 
 const ACCESS_TOKEN_TTL = "30m";
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -229,3 +230,37 @@ export const getProfile = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+export const updateProfile = async (req, res) => {
+    console.log("Content-Type:", req.headers["content-type"]);
+    console.log("Body:", req.body);
+    console.log("File:", req.file);
+
+    try {
+        const userId  = req.user._id;
+        const {  name, phone, address, dob, gender } = req.body
+        const imageFile = req.file
+
+        if (!name || !phone || !dob || !gender) {
+            return res.status(400).json({ success: false, message: "Data Missing" })
+        }
+
+        await userModel.findByIdAndUpdate(userId, { name, phone, address: JSON.parse(address), dob, gender })
+
+        if (imageFile) {
+
+            // upload image to cloudinary
+            const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" })
+            const imageURL = imageUpload.secure_url
+            const imageId = imageUpload.public_id
+
+            await userModel.findByIdAndUpdate(userId, { image: imageURL, imageId: imageId })
+        }
+
+        res.json({ success: true, message: 'Profile Updated' })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ success: false, message: "Failed to update profile" })
+    }
+}

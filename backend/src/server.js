@@ -5,6 +5,8 @@ import authRoute from "./routes/userRoute.js";
 import cookieParser from "cookie-parser";
 import { authUser } from "./middleware/authUser.js";
 
+import connectCloudinary from "./libs/cloudinary.js";
+
 dotenv.config();
 
 const app = express();
@@ -12,6 +14,7 @@ const PORT = process.env.PORT || 3000;
 
 //middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 //public routes
@@ -25,3 +28,5 @@ connectDB().then(() => {
     console.log(`Server running on port ${PORT}`);
   });
 }); // Connect to MongoDB
+
+connectCloudinary();
