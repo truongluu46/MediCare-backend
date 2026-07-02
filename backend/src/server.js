@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import {connectDB} from "./libs/db.js";
 import authRoute from "./routes/userRoute.js";
 import cookieParser from "cookie-parser";
+import { authUser } from "./middleware/authUser.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoute);
 
 //private routes
+app.use(authUser); // Middleware to authenticate user for private routes
 
 connectDB().then(() => {
   app.listen(PORT, () => {
