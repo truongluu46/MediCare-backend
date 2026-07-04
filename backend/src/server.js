@@ -5,6 +5,7 @@ import userRoute from "./routes/userRoute.js";
 import adminRoute from "./routes/adminRoute.js";
 import cookieParser from "cookie-parser";
 import { authUser } from "./middleware/authUser.js";
+import doctorRoute from "./routes/doctorRoute.js";
 
 import connectCloudinary from "./libs/cloudinary.js";
 
@@ -23,8 +24,9 @@ app.use('/api/auth', userRoute);
 
 
 //private routes
-//app.use(authUser); // Middleware to authenticate user for private routes
+//app.use(authUser); 
 app.use('/api/admin', adminRoute);
+app.use('/api/doctor', doctorRoute);
 
 connectDB().then(() => {
   app.listen(PORT, () => {

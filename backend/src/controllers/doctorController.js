@@ -5,7 +5,7 @@ import bcrypt from "bcrypt";
 import appointmentModel from "../models/Appointment.js";
 import validator from "validator";
 import crypto from "crypto";
-
+import Session from "../models/Session.js";
 
 const ACCESS_TOKEN_TTL = "30m";
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -55,7 +55,8 @@ export const loginDoctor = async (req, res) => {
 
     //lưu refresh token vào database
     await Session.create({
-      doctorId: doctor._id,
+      ownerId: doctor._id,
+      ownerType: "Doctor",
       refreshToken,
       expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL), // 7 ngày
     });
@@ -83,3 +84,36 @@ export const loginDoctor = async (req, res) => {
     });
   }
 };
+
+export const getDoctorProfile = async (req, res) => {
+    try {
+
+        const { docId } = req.body
+        console.log(docId)
+        if (!docId) {
+            return res.status(400).json({ success: false, message: "Missing doctor ID" })
+        }
+        const profileData = await doctorModel.findById(docId).select('-password')
+
+        res.json({ success: true, profileData })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+export const updateDoctorProfile = async (req, res) => {
+    try {
+
+        const { docId, fees, address, available } = req.body
+
+        await doctorModel.findByIdAndUpdate(docId, { fees, address, available })
+
+        res.json({ success: true, message: 'Profile Updated' })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
