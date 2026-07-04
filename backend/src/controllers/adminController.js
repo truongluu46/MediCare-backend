@@ -106,3 +106,34 @@ export const addDoctor = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
+
+export const allDoctors = async (req, res) => {
+  try {
+    const doctors = await doctorModel.find({}).select("-password");
+    res.json({ success: true, doctors });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }};
+
+export const getDoctorById = async (req, res) => {
+  try {
+    const { doctorId } = req.body;
+
+    if (!doctorId) {
+      return res.json({ success: false, message: "Missing doctorId" });
+    }
+
+    const doctor = await doctorModel.findById(doctorId).select("-password");
+
+    if (!doctor) {
+      return res.json({ success: false, message: "Doctor not found" });
+    }
+
+    res.json({ success: true, doctor });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
