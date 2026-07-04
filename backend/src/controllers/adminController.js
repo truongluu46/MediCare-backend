@@ -187,3 +187,35 @@ export const editDoctor = async (req, res) => {
   }
 };
 
+export const deleteDoctor = async (req, res) => {
+  try {
+    const { doctorId } = req.body;
+
+    const doctor = await doctorModel.findById(doctorId);
+
+    if (!doctor) {
+      return res.json({
+        success: false,
+        message: "Doctor not found",
+      });
+    }
+
+    // Xóa tất cả lịch hẹn của bác sĩ (nếu muốn)
+    await appointmentModel.deleteMany({ docId: doctorId });
+
+    // Xóa bác sĩ
+    await doctorModel.findByIdAndDelete(doctorId);
+
+    res.json({
+      success: true,
+      message: "Doctor deleted successfully",
+    });
+  } catch (error) {
+    console.log(error);
+    res.json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
