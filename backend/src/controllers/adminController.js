@@ -137,3 +137,53 @@ export const getDoctorById = async (req, res) => {
   }
 };
 
+export const editDoctor = async (req, res) => {
+  try {
+    const {
+      doctorId,
+      name,
+      speciality,
+      degree,
+      experience,
+      about,
+      fees,
+      address,
+    } = req.body;
+    const imageFile = req.file;
+
+    if (!doctorId) {
+      return res.json({ success: false, message: "Missing doctorId" });
+    }
+
+    const doctor = await doctorModel.findById(doctorId);
+    if (!doctor) {
+      return res.json({ success: false, message: "Doctor not found" });
+    }
+
+    const updateData = {};
+
+    if (name) updateData.name = name;
+    if (speciality) updateData.speciality = speciality;
+    if (degree) updateData.degree = degree;
+    if (experience) updateData.experience = experience;
+    if (about) updateData.about = about;
+    if (fees) updateData.fees = fees;
+    if (address) updateData.address = JSON.parse(address);
+
+    // Nếu có upload ảnh mới thì upload lên cloudinary và cập nhật
+    if (imageFile) {
+      const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
+        resource_type: "image",
+      });
+      updateData.image = imageUpload.secure_url;
+    }
+
+    await doctorModel.findByIdAndUpdate(doctorId, updateData);
+
+    res.json({ success: true, message: "Doctor Updated" });
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
