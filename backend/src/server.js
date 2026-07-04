@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 //public routes
-app.use('/api/auth', userRoute);
+app.use('/api/user', userRoute);
 
 
 //private routes
