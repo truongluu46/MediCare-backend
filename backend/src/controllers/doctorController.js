@@ -185,3 +185,146 @@ export const doctorDashboard = async (req, res) => {
         res.status(500).json({ success: false, message: error.message })
     }
 }
+
+export const appointmentsDoctor = async (req, res) => {
+    try {
+
+        const { docId } = req.body
+        const appointments = await appointmentModel.find({ docId })
+
+        res.json({ success: true, appointments })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+export const appointmentComplete = async (req, res) => {
+    try {
+        const { docId, appointmentId } = req.body;
+
+        const appointment = await appointmentModel.findById(appointmentId);
+
+        if (!appointment) {
+            return res.status(404).json({
+                success: false,
+                message: "Appointment not found",
+            });
+        }
+
+        if (!appointment.docId === docId) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized action",
+            });
+        }
+
+        if (appointment.cancelled) {
+            return res.status(400).json({
+                success: false,
+                message: "Appointment has been cancelled",
+            });
+        }
+
+        if (appointment.isCompleted) {
+            return res.status(400).json({
+                success: false,
+                message: "Appointment already completed",
+            });
+        }
+
+        appointment.isCompleted = true;
+        await appointment.save();
+
+        res.json({
+            success: true,
+            message: "Appointment completed successfully",
+        });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};
+
+export const appointmentCancel = async (req, res) => {
+    try {
+        const { docId, appointmentId } = req.body;
+
+        //  Kiểm tra lịch khám
+        const appointment = await appointmentModel.findById(appointmentId);
+
+        if (!appointment) {
+            return res.status(404).json({
+                success: false,
+                message: "Appointment not found"
+            });
+        }
+
+        //  Kiểm tra bác sĩ có quyền hủy không
+        if (!appointment.docId === docId) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized action"
+            });
+        }
+
+        //  Đã hủy rồi
+        if (appointment.cancelled) {
+            return res.status(400).json({
+                success: false,
+                message: "Appointment already cancelled"
+            });
+        }
+
+        // Đã hoàn thành thì không được hủy
+        if (appointment.isCompleted) {
+            return res.status(400).json({
+                success: false,
+                message: "Completed appointment cannot be cancelled"
+            });
+        }
+
+        // Đánh dấu hủy
+        appointment.cancelled = true;
+        await appointment.save();
+
+        // Giải phóng slot của bác sĩ
+        const doctor = await doctorModel.findById(docId);
+
+        if (doctor) {
+            const slots_booked = doctor.slots_booked;
+
+            if (slots_booked[appointment.slotDate]) {
+                slots_booked[appointment.slotDate] =
+                    slots_booked[appointment.slotDate].filter(
+                        slot => slot !== appointment.slotTime
+                    );
+
+                // Nếu ngày đó không còn slot nào thì xóa luôn key
+                if (slots_booked[appointment.slotDate].length === 0) {
+                    delete slots_booked[appointment.slotDate];
+                }
+
+                doctor.markModified("slots_booked");
+                await doctor.save();
+            }
+        }
+
+        return res.json({
+            success: true,
+            message: "Appointment cancelled successfully"
+        });
+
+    } catch (error) {
+        console.log(error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
