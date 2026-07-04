@@ -145,3 +145,43 @@ export const doctorList = async (req, res) => {
     }
 
 }
+
+export const doctorDashboard = async (req, res) => {
+    try {
+
+        const { docId } = req.body
+
+        const appointments = await appointmentModel.find({ docId })
+
+        let earnings = 0
+
+        appointments.map((item) => {
+            if (item.isCompleted || item.payment) {
+                earnings += item.amount
+            }
+        })
+
+        let patients = []
+
+        appointments.map((item) => {
+            if (!patients.includes(item.userId)) {
+                patients.push(item.userId)
+            }
+        })
+
+
+
+        const dashData = {
+            earnings,
+            appointments: appointments.length,
+            patients: patients.length,
+            latestAppointments: appointments.reverse()
+        }
+
+        res.json({ success: true, dashData })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
