@@ -213,7 +213,7 @@ export const appointmentComplete = async (req, res) => {
             });
         }
 
-        if (!appointment.docId === docId) {
+        if (appointment.docId !== docId) {
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized action",
@@ -265,7 +265,7 @@ export const appointmentCancel = async (req, res) => {
         }
 
         //  Kiểm tra bác sĩ có quyền hủy không
-        if (!appointment.docId === docId) {
+        if (appointment.docId !== docId) {
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized action"
