@@ -233,8 +233,20 @@ export const appointmentsAdmin = async (req, res) => {
 export const appointmentCancel = async (req, res) => {
   try {
     const { appointmentId } = req.body;
+    const appointmentData = await appointmentModel.findById(appointmentId);
+
+    if (!appointmentData) {
+      return res.status(404).json({ success: false, message: "Appointment not found" });
+    }
+
     await appointmentModel.findByIdAndUpdate(appointmentId, {
       cancelled: true,
+    });
+
+    // Giải phóng slot của bác sĩ bằng atomic $pull
+    const { docId, slotDate, slotTime } = appointmentData;
+    await doctorModel.findByIdAndUpdate(docId, {
+      $pull: { [`slots_booked.${slotDate}`]: slotTime }
     });
 
     res.json({ success: true, message: "Appointment Cancelled" });

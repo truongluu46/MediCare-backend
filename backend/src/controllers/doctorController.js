@@ -292,27 +292,10 @@ export const appointmentCancel = async (req, res) => {
         appointment.cancelled = true;
         await appointment.save();
 
-        // Giải phóng slot của bác sĩ
-        const doctor = await doctorModel.findById(docId);
-
-        if (doctor) {
-            const slots_booked = doctor.slots_booked;
-
-            if (slots_booked[appointment.slotDate]) {
-                slots_booked[appointment.slotDate] =
-                    slots_booked[appointment.slotDate].filter(
-                        slot => slot !== appointment.slotTime
-                    );
-
-                // Nếu ngày đó không còn slot nào thì xóa luôn key
-                if (slots_booked[appointment.slotDate].length === 0) {
-                    delete slots_booked[appointment.slotDate];
-                }
-
-                doctor.markModified("slots_booked");
-                await doctor.save();
-            }
-        }
+        // Giải phóng slot của bác sĩ 
+        await doctorModel.findByIdAndUpdate(docId, {
+            $pull: { [`slots_booked.${appointment.slotDate}`]: appointment.slotTime }
+        });
 
         return res.json({
             success: true,
