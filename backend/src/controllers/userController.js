@@ -7,6 +7,7 @@ import Session from "../models/Session.js";
 import { cloudinary } from "../libs/cloudinary.js";
 import doctorModel from "../models/Doctor.js";
 import appointmentModel from "../models/Appointment.js";
+import mongoose from "mongoose";
 
 const ACCESS_TOKEN_TTL = "30m";
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -280,11 +281,14 @@ export const updateProfile = async (req, res) => {
 };
 
 export const bookAppointment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const userId = req.user._id;
     const { docId, slotDate, slotTime } = req.body;
 
-    // khóa atomi cái slot lại 
+    // khóa atomic cái slot lại 
     // Điều kiện: Bác sĩ phải có và đang available, và slotTime chưa nằm trong mảng của slotDate
     const updatedDoctor = await doctorModel.findOneAndUpdate(
       { 
@@ -295,22 +299,26 @@ export const bookAppointment = async (req, res) => {
       { 
         $push: { [`slots_booked.${slotDate}`]: slotTime } 
       },
-      { new: true, select: "-password" }
+      { new: true, select: "-password", session }
     ).lean();
 
     if (!updatedDoctor) {
       // Nếu update thất bại, kiểm tra nguyên nhân để trả về lỗi chính xác
-      const docCheck = await doctorModel.findById(docId);
+      const docCheck = await doctorModel.findById(docId).session(session);
+      await session.abortTransaction();
+      session.endSession();
+
       if (!docCheck) return res.status(404).json({ success: false, message: "Doctor not found" });
       if (!docCheck.available) return res.status(400).json({ success: false, message: "Doctor Not Available" });
       return res.status(400).json({ success: false, message: "Slot Not Available (Double Booking Prevented)" });
     }
 
-    const userData = await userModel.findById(userId).select("-password").lean();
+    const userData = await userModel.findById(userId).select("-password").session(session).lean();
 
     if (!userData) {
-      // Nếu user không tồn tại, rollback slot cho bác sĩ
-      await doctorModel.findByIdAndUpdate(docId, { $pull: { [`slots_booked.${slotDate}`]: slotTime } });
+      // Nhờ có Transaction, ta không cần lệnh pull (rollback thủ công) nữa, chỉ cần abort
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
@@ -328,12 +336,16 @@ export const bookAppointment = async (req, res) => {
     };
 
     const newAppointment = new appointmentModel(appointmentData);
-    await newAppointment.save();
+    await newAppointment.save({ session });
 
-    // Slots are already securely updated by findOneAndUpdate above
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({ success: true, message: "Appointment Booked" });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    
     console.log(error);
     res.status(500).json({ success: false, message: error.message });
   }
