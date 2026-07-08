@@ -6,6 +6,7 @@ import appointmentModel from "../models/Appointment.js";
 import validator from "validator";
 import crypto from "crypto";
 import Session from "../models/Session.js";
+import mongoose from "mongoose";
 
 const ACCESS_TOKEN_TTL = "30m";
 const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
@@ -251,21 +252,28 @@ export const appointmentComplete = async (req, res) => {
 };
 
 export const appointmentCancel = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
         const { docId, appointmentId } = req.body;
 
         //  Kiểm tra lịch khám
-        const appointment = await appointmentModel.findById(appointmentId);
+        const appointment = await appointmentModel.findById(appointmentId).session(session);
 
         if (!appointment) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(404).json({
                 success: false,
                 message: "Appointment not found"
             });
         }
 
-        //  Kiểm tra bác sĩ có quyền hủy không
+        //  Kiểm tra bác sĩ có quyền hủy k
         if (appointment.docId !== docId) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized action"
@@ -274,28 +282,34 @@ export const appointmentCancel = async (req, res) => {
 
         //  Đã hủy rồi
         if (appointment.cancelled) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({
                 success: false,
                 message: "Appointment already cancelled"
             });
         }
 
-        // Đã hoàn thành thì không được hủy
+        // cuộc hẹn đã hoàn thành thì không được hủy
         if (appointment.isCompleted) {
+            await session.abortTransaction();
+            session.endSession();
             return res.status(400).json({
                 success: false,
                 message: "Completed appointment cannot be cancelled"
             });
         }
 
-        // Đánh dấu hủy
         appointment.cancelled = true;
-        await appointment.save();
+        await appointment.save({ session });
 
-        // Giải phóng slot của bác sĩ 
+        // xóa slot đã hẹn 
         await doctorModel.findByIdAndUpdate(docId, {
             $pull: { [`slots_booked.${appointment.slotDate}`]: appointment.slotTime }
-        });
+        }, { session });
+
+        await session.commitTransaction();
+        session.endSession();
 
         return res.json({
             success: true,
@@ -303,6 +317,8 @@ export const appointmentCancel = async (req, res) => {
         });
 
     } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
         console.log(error);
 
         return res.status(500).json({

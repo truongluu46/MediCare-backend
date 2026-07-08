@@ -7,6 +7,7 @@ import Session from "../models/Session.js";
 import {cloudinary} from "../libs/cloudinary.js";
 import doctorModel from "../models/Doctor.js";
 import appointmentModel from "../models/Appointment.js";
+import mongoose from "mongoose";
 
 
 export const loginAdmin = async (req, res) => {
@@ -200,7 +201,7 @@ export const deleteDoctor = async (req, res) => {
       });
     }
 
-    // Xóa tất cả lịch hẹn của bác sĩ (nếu muốn)
+    // Xóa tất cả lịch hẹn của bác sĩ 
     await appointmentModel.deleteMany({ docId: doctorId });
 
     // Xóa bác sĩ
@@ -231,26 +232,36 @@ export const appointmentsAdmin = async (req, res) => {
 };
 
 export const appointmentCancel = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const { appointmentId } = req.body;
-    const appointmentData = await appointmentModel.findById(appointmentId);
+    const appointmentData = await appointmentModel.findById(appointmentId).session(session);
 
     if (!appointmentData) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ success: false, message: "Appointment not found" });
     }
 
     await appointmentModel.findByIdAndUpdate(appointmentId, {
       cancelled: true,
-    });
+    }, { session });
 
-    // Giải phóng slot của bác sĩ bằng atomic $pull
+    // xóa slot của bác sĩ 
     const { docId, slotDate, slotTime } = appointmentData;
     await doctorModel.findByIdAndUpdate(docId, {
       $pull: { [`slots_booked.${slotDate}`]: slotTime }
-    });
+    }, { session });
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({ success: true, message: "Appointment Cancelled" });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.log(error);
     res.status(500).json({ success: false, message: error.message });
   }

@@ -370,28 +370,38 @@ export const listAppointment = async (req, res) => {
 };
 
 export const cancelAppointment = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const userId = req.user._id;
     const { appointmentId } = req.body;
-    const appointmentData = await appointmentModel.findById(appointmentId)
+    const appointmentData = await appointmentModel.findById(appointmentId).session(session)
 
     // verify appointment user 
     if (appointmentData.userId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(403).json({ success: false, message: 'Unauthorized action' })
     }
 
-    await appointmentModel.findByIdAndUpdate(appointmentId, { cancelled: true })
+    await appointmentModel.findByIdAndUpdate(appointmentId, { cancelled: true }, { session })
 
     // releasing doctor slot using atomic $pull operator
     const { docId, slotDate, slotTime } = appointmentData
 
     await doctorModel.findByIdAndUpdate(docId, { 
       $pull: { [`slots_booked.${slotDate}`]: slotTime } 
-    })
+    }, { session })
+
+    await session.commitTransaction();
+    session.endSession();
 
     res.json({ success: true, message: 'Appointment Cancelled' })
 
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.log(error)
     res.json({ success: false, message: error.message })
   }
